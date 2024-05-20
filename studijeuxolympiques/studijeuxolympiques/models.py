@@ -37,7 +37,8 @@ class EpreuveSportive(models.Model):
     type_epreuve_sportive = models.CharField(max_length=255)
     duration_epreuve_sportive = models.DurationField()
     niveau_epreuve = models.CharField(max_length=255)
-    hall = models.ForeignKey(Hall, on_delete=models.CASCADE, related_name='epreuves')
+    hall = models.ForeignKey('Hall', on_delete=models.CASCADE, related_name='epreuves')
+    image_url = models.URLField(max_length=500, blank=True, null=True)  # Ajouter ce champ
 
     def __str__(self):
         return self.name_epreuve_sportive

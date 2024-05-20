@@ -21,7 +21,7 @@ class HallSerializer(serializers.ModelSerializer):
 class EpreuveSportiveSerializer(serializers.ModelSerializer):
     class Meta:
         model = EpreuveSportive
-        fields = ['name_epreuve_sportive', 'type_epreuve_sportive', 'duration_epreuve_sportive', 'niveau_epreuve']
+        fields = ['name_epreuve_sportive', 'type_epreuve_sportive', 'duration_epreuve_sportive', 'niveau_epreuve', 'image_url']
 
 class TarifSerializer(serializers.ModelSerializer):
     class Meta:
@@ -67,7 +67,7 @@ class CustomUserSerializer(serializers.ModelSerializer):
         return user
 
 class AchatSerializer(serializers.ModelSerializer):
-    ticket = TicketSerializer()
+    ticket = serializers.PrimaryKeyRelatedField(queryset=Ticket.objects.all())
     user_acheteur_name = serializers.SerializerMethodField()
 
     class Meta:
@@ -76,6 +76,12 @@ class AchatSerializer(serializers.ModelSerializer):
 
     def get_user_acheteur_name(self, obj):
         return obj.user_acheteur.username
+
+    def create(self, validated_data):
+        ticket_id = validated_data.pop('ticket').id
+        ticket = Ticket.objects.get(id=ticket_id)
+        achat = Achat.objects.create(ticket=ticket, **validated_data)
+        return achat
     
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
