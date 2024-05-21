@@ -55,19 +55,26 @@ class TicketSerializer(serializers.ModelSerializer):
         fields = ['id', 'start_time_epreuve', 'complexe_sportif', 'epreuve_sportive', 'hall', 'tarifs', 'remaining_places']
 
 class CustomUserSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+
     class Meta:
         model = CustomUser
-        fields = ['username', 'email', 'tel']
-        extra_kwargs = {'password': {'write_only': True}}
+        fields = ['id', 'username', 'email', 'tel', 'password', 'type']  # Assurez-vous que 'id' est inclus
 
     def create(self, validated_data):
-        user = CustomUser(**validated_data)
+        user = CustomUser(
+            username=validated_data['username'],
+            email=validated_data['email'],
+            tel=validated_data.get('tel', ''),
+            type=validated_data.get('type', 'acheteur')
+        )
         user.set_password(validated_data['password'])  # Hacher le mot de passe
         user.save()
         return user
 
 class AchatSerializer(serializers.ModelSerializer):
     ticket = serializers.PrimaryKeyRelatedField(queryset=Ticket.objects.all())
+    user_acheteur = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())
     user_acheteur_name = serializers.SerializerMethodField()
 
     class Meta:
@@ -97,3 +104,13 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer    
+
+
+class TicketDetailSerializer(serializers.ModelSerializer):
+    epreuve_sportive = EpreuveSportiveSerializer()
+    complexe_sportif = ComplexeSportifSerializer()
+    tarifs = TarifSerializer(many=True)
+
+    class Meta:
+        model = Ticket
+        fields = ['id', 'start_time_epreuve', 'remaining_places', 'administration', 'complexe_sportif', 'epreuve_sportive', 'hall', 'token_ticket', 'tarifs']
