@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-
+from .views import ticket_details
 from studijeuxolympiques.serializers import CustomTokenObtainPairView
 from .views import (
     AdministrationViewSet, ComplexeSportifViewSet, HallViewSet, EpreuveSportiveViewSet, CustomUserViewSet, TarifViewSet, 
@@ -34,4 +34,5 @@ urlpatterns = [
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/user-profile/', UserProfileView.as_view(), name='user_profile'),
     path('api/user-achats/', UserAchatListView.as_view(), name='user_achats'),
+    path('api/ticket-details/<str:ticket_ids>/', ticket_details, name='ticket-details'),
 ]

@@ -12,6 +12,9 @@ from .models import Achat
 from .serializers import AchatSerializer
 from rest_framework.decorators import action
 from rest_framework import viewsets, permissions
+from rest_framework.decorators import api_view
+from .serializers import TicketDetailSerializer  # Ma
+from rest_framework import status
 
 class AdministrationViewSet(viewsets.ModelViewSet):
     queryset = Administration.objects.all()
@@ -108,17 +111,54 @@ class AchatViewSet(viewsets.ModelViewSet):
     serializer_class = AchatSerializer
     permission_classes = [IsAuthenticated]
 
+    def create(self, request, *args, **kwargs):
+        user = request.user
+        try:
+            token_user = user.token_user
+        except TokenUser.DoesNotExist:
+            # Créez une instance de TokenTicket
+            token_ticket = TokenTicket.objects.create(
+                # Ajoutez les champs nécessaires pour TokenTicket ici
+            )
+            # Créez une instance d'AssociationToken
+            association_token = AssociationToken.objects.create(token_ticket=token_ticket)
+            # Créez une instance de TokenUser
+            token_user = TokenUser.objects.create(user=user, association_token=association_token, numero_token='votre_numero_token')  # Remplacez 'votre_numero_token' par le token réel ou générez-le dynamiquement
+
+        # Ensuite, continuez avec la création de l'achat
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+
 class RegisterUserView(generics.CreateAPIView):
     queryset = CustomUser.objects.all()
     permission_classes = (AllowAny,)
     serializer_class = CustomUserSerializer
 
     def perform_create(self, serializer):
-        user = serializer.save(commit=False)
-        user.set_password(serializer.validated_data['password'])  # Hacher le mot de passe
-        user.is_active = True  # Assurez-vous que l'utilisateur est actif
-        user.save()
+        try:
+            user = serializer.save()
+            user.set_password(serializer.validated_data['password'])  # Hacher le mot de passe
+            user.is_active = True  # Assurez-vous que l'utilisateur est actif
+            user.save()
 
+            # Create TokenTicket
+            token_ticket = TokenTicket.objects.create(
+                # Ajouter les champs nécessaires ici pour TokenTicket
+            )
+
+            # Create AssociationToken
+            association_token = AssociationToken.objects.create(token_ticket=token_ticket)
+
+            # Create TokenUser
+            TokenUser.objects.create(user=user, association_token=association_token, numero_token='votre_numero_token')
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
 class UserProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -134,3 +174,14 @@ class UserAchatListView(generics.ListAPIView):
     def get_queryset(self):
         user = self.request.user
         return Achat.objects.filter(user_acheteur=user)  
+    
+
+@api_view(['GET'])
+def ticket_details(request, ticket_ids):
+    try:
+        ids = ticket_ids.split(',')
+        tickets = Ticket.objects.filter(id__in=ids)
+        serializer = TicketDetailSerializer(tickets, many=True)
+        return Response(serializer.data)
+    except Ticket.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
