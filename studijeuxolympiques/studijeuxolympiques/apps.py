@@ -5,4 +5,4 @@ class StudijeuxolympiquesConfig(AppConfig):
     name = 'studijeuxolympiques'
 
     def ready(self):
-        import studijeuxolympiques.signals
+        pass  # Vous pouvez ajouter d'autres initialisations si nécessaire

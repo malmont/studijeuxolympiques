@@ -5,9 +5,10 @@ from .views import ticket_details
 from studijeuxolympiques.serializers import CustomTokenObtainPairView
 from .views import (
     AdministrationViewSet, ComplexeSportifViewSet, HallViewSet, EpreuveSportiveViewSet, CustomUserViewSet, TarifViewSet, 
-    TokenTicketViewSet, AssociationTokenViewSet, TokenUserViewSet, TicketViewSet, AchatViewSet, RegisterUserView, UserAchatListView, UserProfileView
+     TicketViewSet, AchatViewSet, RegisterUserView, UserAchatListView, UserProfileView
 )
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+
 
 router = DefaultRouter()
 router.register(r'administrations', AdministrationViewSet)
@@ -16,9 +17,9 @@ router.register(r'halls', HallViewSet)
 router.register(r'epreuves', EpreuveSportiveViewSet)
 router.register(r'users', CustomUserViewSet)
 router.register(r'tarifs', TarifViewSet)
-router.register(r'tokens_ticket', TokenTicketViewSet)
-router.register(r'association_tokens', AssociationTokenViewSet)
-router.register(r'tokens_user', TokenUserViewSet)
+# router.register(r'tokens_ticket', TokenTicketViewSet)
+# router.register(r'association-tokens', AssociationTokenViewSet)
+# router.register(r'tokens_user', TokenUserViewSet)
 router.register(r'tickets', TicketViewSet)
 router.register(r'achats', AchatViewSet)
 
@@ -35,4 +36,5 @@ urlpatterns = [
     path('api/user-profile/', UserProfileView.as_view(), name='user_profile'),
     path('api/user-achats/', UserAchatListView.as_view(), name='user_achats'),
     path('api/ticket-details/<str:ticket_ids>/', ticket_details, name='ticket-details'),
+    
 ]

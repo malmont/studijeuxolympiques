@@ -2,6 +2,8 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.db.models import F
 
+from .utils import generate_qr_code
+
 class CustomUser(AbstractUser):
     tel = models.CharField(max_length=20, blank=True)
     type = models.CharField(max_length=20)  # 'admin' ou 'acheteur'
@@ -51,26 +53,6 @@ class Tarif(models.Model):
     def __str__(self):
         return self.name_tarif
 
-class TokenTicket(models.Model):
-    numero_token = models.CharField(max_length=255)
-
-    def __str__(self):
-        return self.numero_token
-
-class AssociationToken(models.Model):
-    token_ticket = models.OneToOneField(TokenTicket, on_delete=models.CASCADE, related_name='association')
-
-    def __str__(self):
-        return f"Association for {self.token_ticket.numero_token}"
-
-class TokenUser(models.Model):
-    numero_token = models.CharField(max_length=255)
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='token_user', limit_choices_to={'type': 'acheteur'})
-    association_token = models.OneToOneField(AssociationToken, on_delete=models.CASCADE, related_name='token_user')
-
-    def __str__(self):
-        return self.numero_token
-
 class Ticket(models.Model):
     start_time_epreuve = models.DateTimeField()
     administration = models.ForeignKey(Administration, on_delete=models.CASCADE, related_name='tickets')
@@ -78,7 +60,7 @@ class Ticket(models.Model):
     epreuve_sportive = models.ForeignKey(EpreuveSportive, on_delete=models.CASCADE, related_name='tickets')
     hall = models.ForeignKey(Hall, on_delete=models.CASCADE, related_name='tickets')
     tarifs = models.ManyToManyField(Tarif, related_name='tickets')
-    token_ticket = models.OneToOneField(TokenTicket, on_delete=models.CASCADE, related_name='ticket', null=True, blank=True)
+    # token_ticket = models.OneToOneField(TokenTicket, on_delete=models.CASCADE, related_name='ticket', null=True, blank=True)
     remaining_places = models.IntegerField(default=0)
 
     def __str__(self):
@@ -91,16 +73,7 @@ class Achat(models.Model):
     prix_total = models.DecimalField(max_digits=10, decimal_places=2)
     date_achat = models.DateTimeField(auto_now_add=True)
     user_acheteur = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='achats', limit_choices_to={'type': 'acheteur'})
-
-    def save(self, *args, **kwargs):
-        if not self.pk:  # Vérifie si c'est un nouvel objet
-            if self.ticket.remaining_places >= self.nombre_tickets:
-                self.ticket.remaining_places = F('remaining_places') - self.nombre_tickets
-                self.ticket.save()
-                self.prix_total = self.nombre_tickets * self.prix_ticket
-                super().save(*args, **kwargs)
-            else:
-                raise ValueError("Not enough remaining places")
+    qr_code = models.ImageField(upload_to='qr_codes', blank=True, null=True)
 
     def __str__(self):
         return f"{self.nombre_tickets} tickets bought for {self.ticket.epreuve_sportive.name_epreuve_sportive} on {self.date_achat}"
