@@ -1,6 +1,12 @@
+from io import BytesIO
+from django.http import JsonResponse, HttpResponseBadRequest
+from django.views.decorators.csrf import csrf_exempt
+import qrcode
 from rest_framework import viewsets
-from .models import Administration, ComplexeSportif, Hall, EpreuveSportive, CustomUser, Tarif, TokenTicket, AssociationToken, TokenUser, Ticket, Achat
-from .serializers import (AdministrationSerializer, ComplexeSportifSerializer, HallSerializer, EpreuveSportiveSerializer, CustomUserSerializer, TarifSerializer, TokenTicketSerializer, AssociationTokenSerializer, TokenUserSerializer, TicketSerializer, AchatSerializer)
+import json
+from .utils import generate_qr_code
+from .models import Administration, ComplexeSportif, Hall, EpreuveSportive, CustomUser, Tarif, Ticket, Achat
+from .serializers import (AdministrationSerializer, ComplexeSportifSerializer, HallSerializer, EpreuveSportiveSerializer, CustomUserSerializer, TarifSerializer,TicketSerializer, AchatSerializer)
 from rest_framework import generics
 from .models import CustomUser
 from .serializers import CustomUserSerializer
@@ -8,13 +14,13 @@ from rest_framework.permissions import AllowAny
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from .models import Achat
-from .serializers import AchatSerializer
 from rest_framework.decorators import action
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import api_view
 from .serializers import TicketDetailSerializer  # Ma
 from rest_framework import status
+
+from studijeuxolympiques import serializers
 
 class AdministrationViewSet(viewsets.ModelViewSet):
     queryset = Administration.objects.all()
@@ -74,17 +80,13 @@ class TarifViewSet(viewsets.ModelViewSet):
     queryset = Tarif.objects.all()
     serializer_class = TarifSerializer
 
-class TokenTicketViewSet(viewsets.ModelViewSet):
-    queryset = TokenTicket.objects.all()
-    serializer_class = TokenTicketSerializer
+# class TokenTicketViewSet(viewsets.ModelViewSet):
+#     queryset = TokenTicket.objects.all()
+#     serializer_class = TokenTicketSerializer
 
-class AssociationTokenViewSet(viewsets.ModelViewSet):
-    queryset = AssociationToken.objects.all()
-    serializer_class = AssociationTokenSerializer
-
-class TokenUserViewSet(viewsets.ModelViewSet):
-    queryset = TokenUser.objects.all()
-    serializer_class = TokenUserSerializer
+# class TokenUserViewSet(viewsets.ModelViewSet):
+#     queryset = TokenUser.objects.all()
+#     serializer_class = TokenUserSerializer
 
 class TicketViewSet(viewsets.ModelViewSet):
     queryset = Ticket.objects.all()
@@ -113,24 +115,38 @@ class AchatViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         user = request.user
-        try:
-            token_user = user.token_user
-        except TokenUser.DoesNotExist:
-            # Créez une instance de TokenTicket
-            token_ticket = TokenTicket.objects.create(
-                # Ajoutez les champs nécessaires pour TokenTicket ici
-            )
-            # Créez une instance d'AssociationToken
-            association_token = AssociationToken.objects.create(token_ticket=token_ticket)
-            # Créez une instance de TokenUser
-            token_user = TokenUser.objects.create(user=user, association_token=association_token, numero_token='votre_numero_token')  # Remplacez 'votre_numero_token' par le token réel ou générez-le dynamiquement
-
-        # Ensuite, continuez avec la création de l'achat
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
+        achat_data = serializer.validated_data
+
+        # Vérification des places disponibles
+        ticket = achat_data['ticket']
+        if ticket.remaining_places < achat_data['nombre_tickets']:
+            return Response({"error": "Not enough remaining places"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Création de l'achat
+        achat = Achat.objects.create(**achat_data)
+        
+        # Mise à jour des places restantes
+        ticket.remaining_places -= achat_data['nombre_tickets']
+        ticket.save()
+
+        # Calcul du prix total
+        achat.prix_total = achat.nombre_tickets * achat.prix_ticket
+        
+        # Génération du QR code
+        qr_data = f"Achat ID: {achat.id}, Ticket ID: {achat.ticket.id}, User ID: {achat.user_acheteur.id}"
+        qr_file = generate_qr_code(qr_data)
+        achat.qr_code.save(qr_file.name, qr_file)
+
+        achat.save()
+
+        # Re-serialize the achat instance to include the new qr_code field
+        serializer = self.get_serializer(achat)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+
 
 
 class RegisterUserView(generics.CreateAPIView):
@@ -144,20 +160,10 @@ class RegisterUserView(generics.CreateAPIView):
             user.set_password(serializer.validated_data['password'])  # Hacher le mot de passe
             user.is_active = True  # Assurez-vous que l'utilisateur est actif
             user.save()
-
-            # Create TokenTicket
-            token_ticket = TokenTicket.objects.create(
-                # Ajouter les champs nécessaires ici pour TokenTicket
-            )
-
-            # Create AssociationToken
-            association_token = AssociationToken.objects.create(token_ticket=token_ticket)
-
-            # Create TokenUser
-            TokenUser.objects.create(user=user, association_token=association_token, numero_token='votre_numero_token')
-
+        except KeyError as e:
+            raise serializers.ValidationError({"error": f"Missing field: {str(e)}"})
         except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            raise serializers.ValidationError({"error": str(e)})
         
 class UserProfileView(APIView):
     permission_classes = [IsAuthenticated]
@@ -185,3 +191,24 @@ def ticket_details(request, ticket_ids):
         return Response(serializer.data)
     except Ticket.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
+    
+
+# class AssociationTokenViewSet(viewsets.ModelViewSet):
+#     queryset = AssociationToken.objects.all()
+#     serializer_class = AssociationTokenSerializer
+#     permission_classes = [IsAuthenticated]
+
+# @csrf_exempt
+# def verify_qr_code(request):
+#     if request.method == 'POST':
+#         try:
+#             data = json.loads(request.body)
+#             ticket_id = data.get('ticketId')
+#             user_id = data.get('userId')
+#             purchase_id = data.get('purchaseId')
+
+#             achat = Achat.objects.get(id=purchase_id, ticket__id=ticket_id, user_acheteur__id=user_id)
+#             return JsonResponse({'status': 'success', 'message': 'QR code verified successfully'})
+#         except Achat.DoesNotExist:
+#             return HttpResponseBadRequest('Invalid QR code data')
+#     return HttpResponseBadRequest('Invalid request method')
