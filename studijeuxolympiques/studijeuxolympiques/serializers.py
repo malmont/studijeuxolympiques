@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Administration, ComplexeSportif, Hall, EpreuveSportive, CustomUser, Tarif, TokenTicket, AssociationToken, TokenUser, Ticket, Achat
+from .models import Administration, ComplexeSportif, Hall, EpreuveSportive, CustomUser, Tarif, Ticket, Achat
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 
@@ -28,22 +28,6 @@ class TarifSerializer(serializers.ModelSerializer):
         model = Tarif
         fields = ['name_tarif', 'tarif', 'offre_tarif']
 
-
-class TokenTicketSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = TokenTicket
-        fields = '__all__'
-
-class AssociationTokenSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = AssociationToken
-        fields = '__all__'
-
-class TokenUserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = TokenUser
-        fields = '__all__'
-
 class TicketSerializer(serializers.ModelSerializer):
     complexe_sportif = ComplexeSportifSerializer()
     epreuve_sportive = EpreuveSportiveSerializer()
@@ -59,15 +43,10 @@ class CustomUserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomUser
-        fields = ['id', 'username', 'email', 'tel', 'password', 'type']  # Assurez-vous que 'id' est inclus
+        fields = ['id', 'username', 'email', 'tel', 'password', 'type']  # Assurez-vous que 'id', 'type' et 'password' sont inclus
 
     def create(self, validated_data):
-        user = CustomUser(
-            username=validated_data['username'],
-            email=validated_data['email'],
-            tel=validated_data.get('tel', ''),
-            type=validated_data.get('type', 'acheteur')
-        )
+        user = CustomUser(**validated_data)
         user.set_password(validated_data['password'])  # Hacher le mot de passe
         user.save()
         return user
@@ -89,7 +68,6 @@ class AchatSerializer(serializers.ModelSerializer):
         ticket = Ticket.objects.get(id=ticket_id)
         achat = Achat.objects.create(ticket=ticket, **validated_data)
         return achat
-    
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
@@ -105,12 +83,21 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer    
 
-
 class TicketDetailSerializer(serializers.ModelSerializer):
-    epreuve_sportive = EpreuveSportiveSerializer()
     complexe_sportif = ComplexeSportifSerializer()
+    epreuve_sportive = EpreuveSportiveSerializer()
+    hall = HallSerializer()
     tarifs = TarifSerializer(many=True)
 
     class Meta:
         model = Ticket
-        fields = ['id', 'start_time_epreuve', 'remaining_places', 'administration', 'complexe_sportif', 'epreuve_sportive', 'hall', 'token_ticket', 'tarifs']
+        fields = [
+            'id', 
+            'start_time_epreuve', 
+            'remaining_places', 
+            'administration', 
+            'complexe_sportif', 
+            'epreuve_sportive', 
+            'hall', 
+            'tarifs'
+        ]
