@@ -1,7 +1,8 @@
 
 from datetime import timedelta
 from pathlib import Path
-
+import sys  
+import os
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -146,3 +147,20 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+TESTING = len(sys.argv) > 1 and sys.argv[1] == 'test'
+
+# Ajoutez ce bloc si vous n'avez pas encore la section LOGGING
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'DEBUG' if TESTING else 'WARNING',
+    },
+}
