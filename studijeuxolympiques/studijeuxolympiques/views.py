@@ -21,42 +21,18 @@ from .serializers import TicketDetailSerializer  # Ma
 from rest_framework import status
 
 from studijeuxolympiques import serializers
-from django.conf import settings
-
-# studijeuxolympiques/views.py
-
-from django.conf import settings
-
-# studijeuxolympiques/views.py
-
-from django.conf import settings
 
 class AdministrationViewSet(viewsets.ModelViewSet):
     queryset = Administration.objects.all()
     serializer_class = AdministrationSerializer
 
-    def get_permissions(self):
-        if getattr(settings, 'TESTING', False):
-            return [permissions.AllowAny()]
-        return super().get_permissions()
-
 class ComplexeSportifViewSet(viewsets.ModelViewSet):
     queryset = ComplexeSportif.objects.all()
     serializer_class = ComplexeSportifSerializer
 
-    def get_permissions(self):
-        if getattr(settings, 'TESTING', False):
-            return [permissions.AllowAny()]
-        return super().get_permissions()
-
 class HallViewSet(viewsets.ModelViewSet):
     queryset = Hall.objects.all()
     serializer_class = HallSerializer
-
-    def get_permissions(self):
-        if getattr(settings, 'TESTING', False):
-            return [permissions.AllowAny()]
-        return super().get_permissions()
 
 class EpreuveSportiveViewSet(viewsets.ModelViewSet):
     queryset = EpreuveSportive.objects.all()
@@ -89,29 +65,28 @@ class EpreuveSportiveViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     def get_permissions(self):
-        if getattr(settings, 'TESTING', False):
-            return [permissions.AllowAny()]
         if self.action in ['list', 'retrieve', 'categories', 'by_level']:
-            return [permissions.AllowAny()]
+            self.permission_classes = [permissions.AllowAny]
+        else:
+            self.permission_classes = [permissions.IsAuthenticated]
         return super().get_permissions()
+
 
 class CustomUserViewSet(viewsets.ModelViewSet):
     queryset = CustomUser.objects.all()
     serializer_class = CustomUserSerializer
 
-    def get_permissions(self):
-        if getattr(settings, 'TESTING', False):
-            return [permissions.AllowAny()]
-        return super().get_permissions()
-
 class TarifViewSet(viewsets.ModelViewSet):
     queryset = Tarif.objects.all()
     serializer_class = TarifSerializer
 
-    def get_permissions(self):
-        if getattr(settings, 'TESTING', False):
-            return [permissions.AllowAny()]
-        return super().get_permissions()
+# class TokenTicketViewSet(viewsets.ModelViewSet):
+#     queryset = TokenTicket.objects.all()
+#     serializer_class = TokenTicketSerializer
+
+# class TokenUserViewSet(viewsets.ModelViewSet):
+#     queryset = TokenUser.objects.all()
+#     serializer_class = TokenUserSerializer
 
 class TicketViewSet(viewsets.ModelViewSet):
     queryset = Ticket.objects.all()
@@ -127,20 +102,16 @@ class TicketViewSet(viewsets.ModelViewSet):
         return Response({"detail": "Type d'épreuve sportive non spécifié"}, status=400)
 
     def get_permissions(self):
-        if getattr(settings, 'TESTING', False):
-            return [permissions.AllowAny()]
         if self.action in ['list', 'retrieve', 'by_category']:
-            return [permissions.AllowAny()]
+            self.permission_classes = [permissions.AllowAny]
+        else:
+            self.permission_classes = [permissions.IsAuthenticated]
         return super().get_permissions()
 
 class AchatViewSet(viewsets.ModelViewSet):
     queryset = Achat.objects.all()
     serializer_class = AchatSerializer
-
-    def get_permissions(self):
-        if getattr(settings, 'TESTING', False):
-            return [permissions.AllowAny()]
-        return super().get_permissions()
+    permission_classes = [IsAuthenticated]
 
     def create(self, request, *args, **kwargs):
         user = request.user
@@ -175,6 +146,9 @@ class AchatViewSet(viewsets.ModelViewSet):
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
+
+
+
 class RegisterUserView(generics.CreateAPIView):
     queryset = CustomUser.objects.all()
     permission_classes = (AllowAny,)
@@ -190,7 +164,7 @@ class RegisterUserView(generics.CreateAPIView):
             raise serializers.ValidationError({"error": f"Missing field: {str(e)}"})
         except Exception as e:
             raise serializers.ValidationError({"error": str(e)})
-
+        
 class UserProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -198,7 +172,7 @@ class UserProfileView(APIView):
         user = request.user
         serializer = CustomUserSerializer(user)
         return Response(serializer.data)
-
+    
 class UserAchatListView(generics.ListAPIView):
     serializer_class = AchatSerializer
     permission_classes = [IsAuthenticated]
@@ -206,6 +180,7 @@ class UserAchatListView(generics.ListAPIView):
     def get_queryset(self):
         user = self.request.user
         return Achat.objects.filter(user_acheteur=user)  
+    
 
 @api_view(['GET'])
 def ticket_details(request, ticket_ids):
@@ -216,4 +191,24 @@ def ticket_details(request, ticket_ids):
         return Response(serializer.data)
     except Ticket.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
+    
 
+# class AssociationTokenViewSet(viewsets.ModelViewSet):
+#     queryset = AssociationToken.objects.all()
+#     serializer_class = AssociationTokenSerializer
+#     permission_classes = [IsAuthenticated]
+
+# @csrf_exempt
+# def verify_qr_code(request):
+#     if request.method == 'POST':
+#         try:
+#             data = json.loads(request.body)
+#             ticket_id = data.get('ticketId')
+#             user_id = data.get('userId')
+#             purchase_id = data.get('purchaseId')
+
+#             achat = Achat.objects.get(id=purchase_id, ticket__id=ticket_id, user_acheteur__id=user_id)
+#             return JsonResponse({'status': 'success', 'message': 'QR code verified successfully'})
+#         except Achat.DoesNotExist:
+#             return HttpResponseBadRequest('Invalid QR code data')
+#     return HttpResponseBadRequest('Invalid request method')

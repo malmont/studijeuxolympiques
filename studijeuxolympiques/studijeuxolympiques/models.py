@@ -60,12 +60,24 @@ class Ticket(models.Model):
     epreuve_sportive = models.ForeignKey(EpreuveSportive, on_delete=models.CASCADE, related_name='tickets')
     hall = models.ForeignKey(Hall, on_delete=models.CASCADE, related_name='tickets')
     tarifs = models.ManyToManyField(Tarif, related_name='tickets')
-    # token_ticket = models.OneToOneField(TokenTicket, on_delete=models.CASCADE, related_name='ticket', null=True, blank=True)
     remaining_places = models.IntegerField(default=0)
 
     def __str__(self):
         return f"Ticket for {self.epreuve_sportive.name_epreuve_sportive} at {self.start_time_epreuve}"
 
+    @property
+    def total_sales(self):
+        return self.achats.aggregate(total_sales=models.Sum('nombre_tickets'))['total_sales'] or 0
+
+    def sales_by_offer(self):
+        offers = self.tarifs.all()
+        sales_by_offer = {}
+        for offer in offers:
+            total_sales = self.achats.filter(ticket=self, ticket__tarifs=offer).aggregate(total_sales=models.Sum('nombre_tickets'))['total_sales'] or 0
+            sales_by_offer[offer] = total_sales
+        return sales_by_offer
+    
+    
 class Achat(models.Model):
     ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name='achats')
     nombre_tickets = models.IntegerField()
